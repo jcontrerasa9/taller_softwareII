@@ -6,28 +6,40 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\BulkStoreUsersRequest;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json(User::all());
+        // Definimos un límite seguro: por defecto 15, mínimo 1, máximo 100 por página
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
+        // Laravel extrae automáticamente el parámetro ?page= desde la URL
+        $users = User::paginate($perPage);
+
+        return response()->json($users);
     }
 
-    public function emails(): JsonResponse
+    public function emails(Request $request): JsonResponse
     {
-        return response()->json(User::all(['id', 'email']));
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
+        // Seleccionamos únicamente los campos necesarios y aplicamos paginación
+        $users = User::select('id', 'email')->paginate($perPage);
+
+        return response()->json($users);
     }
 
-    public function overTwenty(): JsonResponse
+    public function overTwenty(Request $request): JsonResponse
     {
         $cutoff = Carbon::now()->subYears(20)->startOfDay();
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
 
-        $users = User::all()->filter(
-            fn (User $user) => $user->birth_date && $user->birth_date->lte($cutoff)
-        )->values();
+        // CORRECCIÓN CLAVE: Filtramos directamente en la Base de Datos con where()
+        $users = User::where('birth_date', '<=', $cutoff)->paginate($perPage);
 
         return response()->json($users);
     }
@@ -46,7 +58,7 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'message' => 'Se crearon 3 usuarios correctamente.',
+            'message' => 'Se crearon los usuarios correctamente.',
             'users' => $created,
         ], 201);
     }
